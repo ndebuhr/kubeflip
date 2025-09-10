@@ -3,7 +3,6 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ include "kubeflip.fullname" . }}-scale-down
-  namespace: {{ .Values.namespace }}
   labels:
     {{- include "kubeflip.labels" . | nindent 4 }}
 spec:
@@ -38,7 +37,7 @@ spec:
             - |
               set -e
 
-              NAMESPACE={{ .Values.namespace }}
+              NAMESPACE={{ .Release.Namespace }}
               echo "Starting scale-down process in namespace: $NAMESPACE"
 
               echo "Processing Deployments..."
