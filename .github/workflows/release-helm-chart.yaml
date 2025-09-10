@@ -1,0 +1,67 @@
+name: Release Helm Chart
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Chart version: $VERSION"
+
+      - name: Update Chart.yaml version
+        run: |
+          sed -i "s/^version:.*/version: ${{ steps.get_version.outputs.VERSION }}/" chart/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: ${{ steps.get_version.outputs.VERSION }}/" chart/Chart.yaml
+
+      - name: Package Helm chart
+        run: |
+          helm package chart/ --destination ./dist
+          helm repo index ./dist --url https://charts.kubeflip.com
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload chart to GCS
+        run: |
+          # Upload the packaged chart
+          gsutil cp ./dist/kubeflip-${{ steps.get_version.outputs.VERSION }}.tgz gs://charts.kubeflip.com/
+
+          # Upload the index.yaml file
+          gsutil cp ./dist/index.yaml gs://charts.kubeflip.com/
+
+          # Set proper cache control headers for the index
+          gsutil setmeta -h "Cache-Control:public, max-age=60" gs://charts.kubeflip.com/index.yaml
+
+      - name: Verify upload
+        run: |
+          echo "Chart uploaded successfully!"
+          echo "Chart URL: https://charts.kubeflip.com/kubeflip-${{ steps.get_version.outputs.VERSION }}.tgz"
+          echo "Repository URL: https://charts.kubeflip.com/index.yaml"

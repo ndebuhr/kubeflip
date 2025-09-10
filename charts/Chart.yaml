@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kubeflip
+description: A Helm chart for Kubeflip - primitive Kubernetes resource scaling for cost optimization
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+- finops
+- cost-optimization
+- autoscaling
+- kubernetes
+maintainers:
+- name: Neal DeBuhr
+home: https://github.com/ndebuhr/kubeflip

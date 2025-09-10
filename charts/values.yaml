@@ -1,0 +1,36 @@
+namespace: default
+
+serviceAccount:
+  create: true
+  name: kubeflip
+
+rbac:
+  create: true
+
+scaleDown:
+  enabled: true
+  schedule: "0 19 * * *"
+  image:
+    repository: bitnami/kubectl
+    tag: 1.33.4
+    pullPolicy: IfNotPresent
+  resources: {}
+
+scaleUp:
+  enabled: true
+  schedule: "0 7 * * *"
+  image:
+    repository: bitnami/kubectl
+    tag: 1.33.4
+    pullPolicy: IfNotPresent
+  resources: {}
+
+jobHistory:
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

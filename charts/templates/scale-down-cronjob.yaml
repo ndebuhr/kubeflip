@@ -1,0 +1,77 @@
+{{- if .Values.scaleDown.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "kubeflip.fullname" . }}-scale-down
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kubeflip.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.scaleDown.schedule | quote }}
+  successfulJobsHistoryLimit: {{ .Values.jobHistory.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.jobHistory.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ .Values.serviceAccount.name }}
+          restartPolicy: OnFailure
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+          - name: scale-down
+            image: {{ .Values.scaleDown.image.repository }}:{{ .Values.scaleDown.image.tag }}
+            imagePullPolicy: {{ .Values.scaleDown.image.pullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              NAMESPACE={{ .Values.namespace }}
+              echo "Starting scale-down process in namespace: $NAMESPACE"
+
+              echo "Processing Deployments..."
+              for deployment in $(kubectl get deployments -n $NAMESPACE -o name); do
+                name=$(echo $deployment | cut -d'/' -f2)
+                replicas=$(kubectl get $deployment -n $NAMESPACE -o jsonpath='{.spec.replicas}')
+
+                if [ "$replicas" != "0" ] && [ -n "$replicas" ]; then
+                  echo "Saving replicas=$replicas for deployment $name"
+                  kubectl annotate $deployment -n $NAMESPACE kubeflip.com/replicas=$replicas --overwrite
+                  echo "Scaling $name to 0 replicas"
+                  kubectl scale $deployment -n $NAMESPACE --replicas=0
+                else
+                  echo "Skipping $name (already at 0 replicas or no replicas set)"
+                fi
+              done
+
+              echo "Processing StatefulSets..."
+              for statefulset in $(kubectl get statefulsets -n $NAMESPACE -o name); do
+                name=$(echo $statefulset | cut -d'/' -f2)
+                replicas=$(kubectl get $statefulset -n $NAMESPACE -o jsonpath='{.spec.replicas}')
+
+                if [ "$replicas" != "0" ] && [ -n "$replicas" ]; then
+                  echo "Saving replicas=$replicas for statefulset $name"
+                  kubectl annotate $statefulset -n $NAMESPACE kubeflip.com/replicas=$replicas --overwrite
+                  echo "Scaling $name to 0 replicas"
+                  kubectl scale $statefulset -n $NAMESPACE --replicas=0
+                else
+                  echo "Skipping $name (already at 0 replicas or no replicas set)"
+                fi
+              done
+
+              echo "Scale-down process completed successfully"
+            resources:
+              {{- toYaml .Values.scaleDown.resources | nindent 14 }}
+{{- end -}}

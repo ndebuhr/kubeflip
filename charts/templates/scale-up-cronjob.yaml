@@ -1,0 +1,77 @@
+{{- if .Values.scaleUp.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "kubeflip.fullname" . }}-scale-up
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kubeflip.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.scaleUp.schedule | quote }}
+  successfulJobsHistoryLimit: {{ .Values.jobHistory.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.jobHistory.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ .Values.serviceAccount.name }}
+          restartPolicy: OnFailure
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+          - name: scale-up
+            image: {{ .Values.scaleUp.image.repository }}:{{ .Values.scaleUp.image.tag }}
+            imagePullPolicy: {{ .Values.scaleUp.image.pullPolicy }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              NAMESPACE={{ .Values.namespace }}
+              echo "Starting scale-up process in namespace: $NAMESPACE"
+
+              echo "Processing Deployments..."
+              for deployment in $(kubectl get deployments -n $NAMESPACE -o name); do
+                name=$(echo $deployment | cut -d'/' -f2)
+                saved_replicas=$(kubectl get $deployment -n $NAMESPACE -o jsonpath='{.metadata.annotations.kubeflip\.com/replicas}')
+
+                if [ -n "$saved_replicas" ]; then
+                  echo "Restoring $name to $saved_replicas replicas"
+                  kubectl scale $deployment -n $NAMESPACE --replicas=$saved_replicas
+                  echo "Removing kubeflip.com/replicas annotation from $name"
+                  kubectl annotate $deployment -n $NAMESPACE kubeflip.com/replicas-
+                else
+                  echo "No saved replica count for $name, skipping"
+                fi
+              done
+
+              echo "Processing StatefulSets..."
+              for statefulset in $(kubectl get statefulsets -n $NAMESPACE -o name); do
+                name=$(echo $statefulset | cut -d'/' -f2)
+                saved_replicas=$(kubectl get $statefulset -n $NAMESPACE -o jsonpath='{.metadata.annotations.kubeflip\.com/replicas}')
+
+                if [ -n "$saved_replicas" ]; then
+                  echo "Restoring $name to $saved_replicas replicas"
+                  kubectl scale $statefulset -n $NAMESPACE --replicas=$saved_replicas
+                  echo "Removing kubeflip.com/replicas annotation from $name"
+                  kubectl annotate $statefulset -n $NAMESPACE kubeflip.com/replicas-
+                else
+                  echo "No saved replica count for $name, skipping"
+                fi
+              done
+
+              echo "Scale-up process completed successfully"
+            resources:
+              {{- toYaml .Values.scaleUp.resources | nindent 14 }}
+{{- end -}}
