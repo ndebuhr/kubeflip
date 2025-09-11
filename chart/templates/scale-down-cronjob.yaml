@@ -1,10 +1,10 @@
-{{- if .Values.scaleDown.enabled -}}
+{{ if .Values.scaleDown.enabled }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ include "kubeflip.fullname" . }}-scale-down
   labels:
-    {{- include "kubeflip.labels" . | nindent 4 }}
+    {{ include "kubeflip.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.scaleDown.schedule | quote }}
   successfulJobsHistoryLimit: {{ .Values.jobHistory.successfulJobsHistoryLimit }}
@@ -72,5 +72,5 @@ spec:
 
               echo "Scale-down process completed successfully"
             resources:
-              {{- toYaml .Values.scaleDown.resources | nindent 14 }}
-{{- end -}}
+              {{ toYaml .Values.scaleDown.resources | nindent 14 }}
+{{ end }}
