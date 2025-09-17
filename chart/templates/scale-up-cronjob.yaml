@@ -32,7 +32,7 @@ spec:
             image: {{ .Values.scaleUp.image.repository }}:{{ .Values.scaleUp.image.tag }}
             imagePullPolicy: {{ .Values.scaleUp.image.pullPolicy }}
             command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
               set -e
