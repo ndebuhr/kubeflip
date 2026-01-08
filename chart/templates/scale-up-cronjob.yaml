@@ -9,6 +9,7 @@ spec:
   schedule: {{ .Values.scaleUp.schedule | quote }}
   successfulJobsHistoryLimit: {{ .Values.jobHistory.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.jobHistory.failedJobsHistoryLimit }}
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
       template:
